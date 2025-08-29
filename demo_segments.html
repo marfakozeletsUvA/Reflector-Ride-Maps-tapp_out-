@@ -91,5 +91,49 @@ map.on('load', async () => {
   }
 });
 </script>
+  <script>
+// single popup reused for performance
+const hoverPopup = new mapboxgl.Popup({
+  closeButton: false,
+  closeOnClick: false,
+  offset: 12,
+  className: 'speed-hover'
+});
+
+// show tooltip on hover
+map.on('mousemove', 'ride-colored-by-speed', (e) => {
+  const f = e.features && e.features[0];
+  if (!f) return;
+
+  // read speed from your properties; fall back names just in case
+  const raw =
+    f.properties['Speed GPS'] ??
+    f.properties['speed_kmh'] ??
+    f.properties['speed'] ??
+    null;
+
+  const speed =
+    raw == null || isNaN(Number(raw)) ? null : Number(raw);
+
+  const html = speed == null
+    ? `<div style="font:13px sans-serif;">Speed: n/a</div>`
+    : `<div style="font:13px sans-serif;">
+         <strong>${speed.toFixed(1)}</strong> km/h
+       </div>`;
+
+  hoverPopup
+    .setLngLat(e.lngLat)
+    .setHTML(html)
+    .addTo(map);
+
+  map.getCanvas().style.cursor = 'pointer';
+});
+
+// hide tooltip when leaving the layer
+map.on('mouseleave', 'ride-colored-by-speed', () => {
+  hoverPopup.remove();
+  map.getCanvas().style.cursor = '';
+});
+</script>
 </body>
 </html>
