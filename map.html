@@ -2,74 +2,62 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Reflector Ride Map</title>
+  <title>Ride Map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    #map { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+    html, body { margin:0; padding:0; height:100%; }
+    #map { position:absolute; top:0; bottom:0; width:100%; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <script>
-    // Mapbox token
-    mapboxgl.accessToken = 'pk.eyJ1IjoidG9tdmFuYXJtYW4iLCJhIjoiRDlFeWFVdyJ9.B6ZgpP0CsDlAF1D1emvosg';
+<div id="map"></div>
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoidG9tdmFuYXJtYW4iLCJhIjoiRDlFeWFVdyJ9.B6ZgpP0CsDlAF1D1emvosg';
 
-    // Initialize the map with your custom style
-    const map = new mapboxgl.Map({
-      container: 'map',
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [4.895, 52.37],
-      zoom: 12
-    });
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/tomvanarman/cmex2zt37009i01sb94ddabw4',
+  center: [4.895, 52.37],
+  zoom: 12
+});
 
-    map.on('load', async () => {
-      try {
-        // Load your GeoJSON from GitHub Pages
-        const resp = await fetch('https://tomvanarman.github.io/Reflector-Ride-Maps/track_segments.geojson');
-        const data = await resp.json();
+map.on('load', async () => {
+  const resp = await fetch('https://tomvanarman.github.io/Reflector-Ride-Maps/track_segments.geojson');
+  const data = await resp.json();
 
-        // Add source and speed-colored layer
-        map.addSource('ride-segments', { type: 'geojson', data });
-        map.addLayer({
-          id: 'ride-colored-by-speed',
-          type: 'line',
-          source: 'ride-segments',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: {
-            'line-width': 4,
-            'line-color': [
-              'interpolate', ['linear'], ['coalesce', ['get', 'speed_kmh'], 0],
-              0,'#4575b4',
-              10,'#91bfdb',
-              20,'#e0f3f8',
-              25,'#ffffbf',
-              30,'#fee090',
-              35,'#fc8d59',
-              40,'#d73027'
-            ]
-          }
-        });
+  map.addSource('ride-segments', { type: 'geojson', data });
 
-        // Fit the map to the data bounds
-        const bounds = new mapboxgl.LngLatBounds();
-        (data.features || []).forEach(f => {
-          if (!f || !f.geometry) return;
-          if (f.geometry.type === 'LineString') {
-            (f.geometry.coordinates || []).forEach(c => bounds.extend(c));
-          } else if (f.geometry.type === 'MultiLineString') {
-            (f.geometry.coordinates || []).forEach(line => (line || []).forEach(c => bounds.extend(c)));
-          }
-        });
-        if (!bounds.isEmpty()) {
-          map.fitBounds(bounds, { padding: 40, maxZoom: 16 });
-        }
-      } catch (e) {
-        console.error('Failed to load ride data', e);
-      }
-    });
-  </script>
+  map.addLayer({
+    id: 'ride-colored-by-speed',
+    type: 'line',
+    source: 'ride-segments',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-width': 4,
+      'line-color': [
+        'interpolate', ['linear'], ['coalesce', ['get', 'speed_kmh'], 0],
+        0,'#4575b4',
+        10,'#91bfdb',
+        20,'#e0f3f8',
+        25,'#ffffbf',
+        30,'#fee090',
+        35,'#fc8d59',
+        40,'#d73027'
+      ]
+    }
+  });
+
+  // Fit to track bounds
+  const bounds = new mapboxgl.LngLatBounds();
+  data.features.forEach(f => {
+    if (f.geometry.type === 'LineString') {
+      f.geometry.coordinates.forEach(c => bounds.extend(c));
+    }
+  });
+  if (!bounds.isEmpty()) map.fitBounds(bounds, { padding: 40, maxZoom: 16 });
+});
+</script>
 </body>
 </html>
