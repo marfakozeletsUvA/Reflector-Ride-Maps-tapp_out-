@@ -1,23 +1,30 @@
 import folium
 import glob
 import json
+import os
 
-# Create a black basemap centered on Amsterdam (adjust if needed)
+# Center on Amsterdam (adjust if needed)
 m = folium.Map(location=[52.35, 4.91], zoom_start=15, tiles=None)
-folium.TileLayer('CartoDB dark_matter').add_to(m)
+folium.TileLayer("CartoDB dark_matter").add_to(m)
 
-# Loop through all GeoJSON files
-for file in glob.glob("*.geojson"):  # change path if needed
+# Find all .geojson files inside sensor_data/*/
+geojson_files = glob.glob("sensor_data/*/*.geojson")
+
+for file in geojson_files:
     with open(file, "r") as f:
         data = json.load(f)
         folium.GeoJson(
             data,
+            name=os.path.basename(file),  # optional: adds layer name from filename
             style_function=lambda feature: {
-                "color": "red",   # line color
+                "color": "red",   # you could also randomize per sensor
                 "weight": 2,
                 "opacity": 0.8,
             }
         ).add_to(m)
+
+# Add a layer control so you can toggle sensors on/off
+folium.LayerControl().add_to(m)
 
 # Save map
 m.save("overlay_map.html")
