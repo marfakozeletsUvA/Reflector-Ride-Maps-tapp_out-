@@ -29,19 +29,19 @@ map.on('load', () => {
   map.addSource('trips', {
     type: 'vector',
     url: 'http://localhost:8080/data/trips.json'
-  });
+});
 
-  // Add line layer
-  map.addLayer({
-    id: 'trip-lines',
-    type: 'line',
-    source: 'trips',
-    'source-layer': 'trips', // this is usually the name of the layer inside your PMTiles
-    paint: {
-      'line-color': '#FF6600',
-      'line-width': 2
-    }
-  });
+map.addLayer({
+  id: 'trip-lines',
+  type: 'line',
+  source: 'trips',
+  'source-layer': 'pmtiles', // <-- this must match the identifier from tileserver
+  paint: {
+    'line-color': '#FF6600',
+    'line-width': 2
+  }
+});
+
 });
 </script>
 </body>
