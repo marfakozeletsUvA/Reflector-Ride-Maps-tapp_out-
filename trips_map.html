@@ -2,10 +2,11 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Trips Map</title>
+  <title>Trips + Ambulance Map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <style>
     html, body { margin:0; padding:0; height:100%; }
     #map { position:absolute; top:0; bottom:0; width:100%; }
@@ -25,19 +26,16 @@ const map = new mapboxgl.Map({
 });
 
 map.on('load', async () => {
-  // Add PMTiles vector source
+  // 1️⃣ Add PMTiles vector source
   map.addSource('trips', {
     type: 'vector',
     url: 'http://localhost:8080/data/pmtiles.json'
   });
 
-  // Fetch TileJSON to get all layer IDs
   const response = await fetch('http://localhost:8080/data/pmtiles.json');
   const tileJSON = await response.json();
-
   const tripLayers = tileJSON.vector_layers.map(layer => layer.id);
 
-  // Add a line layer for each trip
   tripLayers.forEach(layerId => {
     map.addLayer({
       id: layerId,
@@ -51,21 +49,29 @@ map.on('load', async () => {
     });
   });
 
-  // ✅ Add ambulance grid GeoJSON layer
+  // 2️⃣ Add ambulance grid GeoJSON source
   map.addSource('ambulance_calls', {
     type: 'geojson',
     data: 'http://localhost:8000/sensor_data/ambulance_calls.geojson'
   });
 
+  // 3️⃣ Add fill layer for ambulance grid
   map.addLayer({
     id: 'ambulance-layer',
-    type: 'fill', // use 'fill' because your data is polygon/grid
+    type: 'fill',
     source: 'ambulance_calls',
     paint: {
       'fill-color': '#1E90FF',
-      'fill-opacity': 0.4,
+      'fill-opacity': 0.6,
       'fill-outline-color': '#0000FF'
     }
+  });
+
+  // 4️⃣ Fit map to the ambulance grid bounds
+  map.getSource('ambulance_calls').once('data', (e) => {
+    if (e.sourceDataType === 'metadata') return; // wait for actual data
+    const bbox = turf.bbox(map.getSource('ambulance_calls')._data);
+    map.fitBounds(bbox, { padding: 20 });
   });
 });
 </script>
