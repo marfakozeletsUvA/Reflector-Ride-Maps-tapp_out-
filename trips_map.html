@@ -10,36 +10,103 @@
   <style>
     body { margin:0; padding:0; }
     #map { position:absolute; top:0; bottom:0; width:100%; }
-    #sliderContainer {
+    #toolbox {
       position: absolute;
       z-index: 1;
       top: 10px;
       left: 10px;
-      background: rgba(255,255,255,0.9);
-      padding: 10px;
-      border-radius: 5px;
+      background: rgba(255,255,255,0.95);
+      padding: 12px;
+      border-radius: 8px;
       font-family: sans-serif;
+      min-width: 220px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #toolbox h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: #333;
+    }
+    .layer-control {
+      margin-bottom: 15px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid #ddd;
+    }
+    .layer-control:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .layer-control label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 600;
+      color: #555;
+    }
+    .layer-control input[type="checkbox"] {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+    .slider-section {
+      margin-top: 10px;
+      padding-left: 24px;
+      display: none;
+    }
+    .slider-section.active {
+      display: block;
+    }
+    .slider-section label {
+      font-size: 13px;
+      color: #666;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .slider-section input[type="range"] {
+      width: 100%;
     }
     #error {
       position: absolute;
       z-index: 2;
-      top: 70px;
-      left: 10px;
-      background: rgba(255,0,0,0.9);
+      top: 10px;
+      right: 10px;
+      background: rgba(231,76,60,0.95);
       color: white;
       padding: 10px;
       border-radius: 5px;
       font-family: sans-serif;
       display: none;
+      max-width: 300px;
     }
   </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="sliderContainer">
-  <label for="densitySlider">Min Value: <span id="sliderValue">0.0</span></label><br>
-  <input type="range" id="densitySlider" min="0" max="1.0" step="0.01" value="0">
+
+<div id="toolbox">
+  <h3>Map Layers</h3>
+  
+  <div class="layer-control">
+    <label>
+      <input type="checkbox" id="tripsCheckbox" checked>
+      Trip Routes
+    </label>
+  </div>
+  
+  <div class="layer-control">
+    <label>
+      <input type="checkbox" id="ambulanceCheckbox" checked>
+      Ambulance Calls
+    </label>
+    <div class="slider-section active" id="ambulanceSlider">
+      <label for="densitySlider">
+        Min Value: <span id="sliderValue">0.0</span>
+      </label>
+      <input type="range" id="densitySlider" min="0" max="1.0" step="0.01" value="0">
+    </div>
+  </div>
 </div>
+
 <div id="error"></div>
 
 <script>
@@ -88,6 +155,16 @@ map.on('load', async () => {
     });
 
     console.log('Trip layers loaded:', tripLayers);
+    
+    // Toggle trips visibility
+    const tripsCheckbox = document.getElementById('tripsCheckbox');
+    tripsCheckbox.addEventListener('change', (e) => {
+      const visibility = e.target.checked ? 'visible' : 'none';
+      tripLayers.forEach(layerId => {
+        map.setLayoutProperty(layerId, 'visibility', visibility);
+      });
+    });
+    
   } catch (err) {
     showError('Error loading trips: ' + err.message);
     console.error(err);
@@ -156,6 +233,18 @@ map.on('load', async () => {
     map.setFilter('ambulance-layer', ['>=', ['get', propertyName], 0]);
 
     console.log('Ambulance layer loaded successfully');
+
+    // Toggle ambulance layer visibility
+    const ambulanceCheckbox = document.getElementById('ambulanceCheckbox');
+    const ambulanceSlider = document.getElementById('ambulanceSlider');
+    
+    ambulanceCheckbox.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      map.setLayoutProperty('ambulance-layer', 'visibility', isChecked ? 'visible' : 'none');
+      // Show/hide slider when checkbox is toggled
+      ambulanceSlider.classList.toggle('active', isChecked);
+    });
+
   } catch (err) {
     showError('Error loading ambulance data: ' + err.message);
     console.error(err);
