@@ -2,109 +2,123 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Trips + Ambulance Heatmap Toggle</title>
-  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
-  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <title>Amsterdam PMTiles + Ambulance Filter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Mapbox GL JS CSS -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.22.0/mapbox-gl.css" rel="stylesheet">
+
   <style>
-    html, body { margin:0; padding:0; height:100%; }
+    body { margin:0; padding:0; }
     #map { position:absolute; top:0; bottom:0; width:100%; }
-    #layerToggle {
+    #sliderContainer {
       position: absolute;
+      z-index: 1;
       top: 10px;
       left: 10px;
-      z-index: 1;
       background: rgba(255,255,255,0.9);
-      padding: 8px;
-      border-radius: 4px;
+      padding: 10px;
+      border-radius: 5px;
       font-family: sans-serif;
     }
   </style>
 </head>
 <body>
+
 <div id="map"></div>
 
-<div id="layerToggle">
-  <label><input type="checkbox" id="ambulanceCheckbox" checked> Show Ambulance Heatmap</label>
+<div id="sliderContainer">
+  <label for="densitySlider">Min Density: <span id="sliderValue">0.0051</span></label><br>
+  <input type="range" id="densitySlider" min="0.0051" max="8.8769" step="0.01" value="0.0051">
 </div>
 
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.22.0/mapbox-gl.js"></script>
 <script>
-mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmFwb25vcmFuIiwiYSI6ImNtZ2U5d2U1dDFvazAybHM3a3Z1MWV0NmoifQ.lkO31BX5zlftfC2w412m2Q';
+  mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmFwb25vcmFuIiwiYSI6ImNtZ2U5d2U1dDFvazAybHM3a3Z1MWV0NmoifQ.lkO31BX5zlftfC2w412m2Q';
 
-const map = new mapboxgl.Map({
-  container: 'map',
-  style: 'mapbox://styles/mapbox/dark-v11',
-  center: [4.895, 52.37],
-  zoom: 12
-});
-
-map.on('load', async () => {
-  // Add PMTiles trips
-  map.addSource('trips', {
-    type: 'vector',
-    url: 'http://localhost:8080/data/pmtiles.json'
+  const map = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/light-v11',
+    center: [4.9, 52.37],
+    zoom: 11
   });
 
-  const response = await fetch('http://localhost:8080/data/pmtiles.json');
-  const tileJSON = await response.json();
-  const tripLayers = tileJSON.vector_layers.map(layer => layer.id);
+  map.on('load', function() {
+    // 1️⃣ PMTiles routes
+    map.addSource('trips', {
+      type: 'vector',
+      url: 'http://localhost:8080/trips.pmtiles'
+    });
 
-  tripLayers.forEach(layerId => {
     map.addLayer({
-      id: layerId,
+      id: 'trips-layer',
       type: 'line',
       source: 'trips',
-      'source-layer': layerId,
+      'source-layer': 'trips',
       paint: {
-        'line-color': '#FF6600',
-        'line-width': 2
+        'line-color': '#FF5733',
+        'line-width': 1
+      }
+    });
+
+    // 2️⃣ Amsterdam polygons (density grid)
+    map.addSource('amsterdam', {
+      type: 'geojson',
+      data: 'http://localhost:8080/amsterdam_grid_wgs84.geojson'
+    });
+
+    // Green → Yellow → Red color scale
+    map.addLayer({
+      id: 'amsterdam-layer',
+      type: 'fill',
+      source: 'amsterdam',
+      paint: {
+        'fill-color': [
+          'interpolate',
+          ['linear'],
+          ['get', 'omgevingsadressendichtheid'],
+          0.0051, '#2ECC71',   // low = green
+          2.0, '#F1C40F',      // medium = yellow
+          5.0, '#E67E22',      // high-medium = orange
+          8.8769, '#E74C3C'    // high = red
+        ],
+        'fill-opacity': 0.7,
+        'fill-outline-color': '#555'
+      }
+    });
+
+    // 3️⃣ Slider filter
+    const slider = document.getElementById('densitySlider');
+    const sliderValue = document.getElementById('sliderValue');
+
+    slider.addEventListener('input', function(e) {
+      const value = parseFloat(e.target.value);
+      sliderValue.textContent = value.toFixed(2);
+      map.setFilter('amsterdam-layer', ['>=', ['get', 'omgevingsadressendichtheid'], value]);
+    });
+
+    map.setFilter('amsterdam-layer', ['>=', ['get', 'omgevingsadressendichtheid'], 0.0051]);
+
+    // 4️⃣ Ambulance calls
+    map.addSource('ambulance_calls', {
+      type: 'geojson',
+      data: 'http://localhost:8080/ambulance_calls.geojson'
+    });
+
+    map.addLayer({
+      id: 'ambulance-layer',
+      type: 'circle',
+      source: 'ambulance_calls',
+      paint: {
+        'circle-radius': 4,
+        'circle-color': '#1E90FF',
+        'circle-opacity': 0.7,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#ffffff'
       }
     });
   });
-
-  // Add ambulance grid GeoJSON
-  map.addSource('ambulance_calls', {
-    type: 'geojson',
-    data: 'http://localhost:8000/sensor_data/ambulance_calls.geojson'
-  });
-
-  // Add heatmap-style fill layer
-  map.addLayer({
-    id: 'ambulance-layer',
-    type: 'fill',
-    source: 'ambulance_calls',
-    paint: {
-      'fill-color': [
-        'interpolate',
-        ['linear'],
-        ['get', 'c28992r1000'],  // number of calls
-        0, '#f7fbff',             // very light (low calls)
-        50, '#41b6c4',            // medium
-        200, '#e31a1c'            // high calls
-      ],
-      'fill-opacity': 0.7,
-      'fill-outline-color': '#000000'
-    }
-  });
-
-  // Fit map to ambulance grid bounds
-  map.getSource('ambulance_calls').once('data', (e) => {
-    if (e.sourceDataType === 'metadata') return;
-    const bbox = turf.bbox(map.getSource('ambulance_calls')._data);
-    map.fitBounds(bbox, { padding: 20 });
-  });
-
-  // Toggle layer visibility
-  const checkbox = document.getElementById('ambulanceCheckbox');
-  checkbox.addEventListener('change', (e) => {
-    map.setLayoutProperty(
-      'ambulance-layer',
-      'visibility',
-      e.target.checked ? 'visible' : 'none'
-    );
-  });
-});
 </script>
+
 </body>
 </html>
