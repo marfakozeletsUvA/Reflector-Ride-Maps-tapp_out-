@@ -37,8 +37,8 @@
 <body>
 <div id="map"></div>
 <div id="sliderContainer">
-  <label for="densitySlider">Min Scaled Value: <span id="sliderValue">0.005</span></label><br>
-  <input type="range" id="densitySlider" min="0.005" max="8.8769" step="0.01" value="0.005">
+  <label for="densitySlider">Min Value: <span id="sliderValue">0.0</span></label><br>
+  <input type="range" id="densitySlider" min="0" max="1.0" step="0.01" value="0">
 </div>
 <div id="error"></div>
 
@@ -60,6 +60,9 @@ function showError(msg) {
 }
 
 map.on('load', async () => {
+  // Define propertyName at the top so it's available everywhere
+  let propertyName = 'Total';  // Default, will update after checking the data
+  
   try {
     // --- Load trips via tile server (like your working version) ---
     map.addSource('trips', {
@@ -92,6 +95,7 @@ map.on('load', async () => {
 
   try {
     // --- Load ambulance GeoJSON ---
+    // Change filename to match your actual file
     const geojsonResponse = await fetch('http://localhost:8000/sensor_data/ambulance_calls.geojson');
     const geojsonData = await geojsonResponse.json();
     
@@ -99,12 +103,23 @@ map.on('load', async () => {
     console.log('Sample feature:', geojsonData.features[0]);
     console.log('Available properties:', Object.keys(geojsonData.features[0].properties));
 
+    // Check which property to use for color coding
+    if ('rate_per_1000' in geojsonData.features[0].properties) {
+      propertyName = 'rate_per_1000';
+    } else if ('Total_scaled' in geojsonData.features[0].properties) {
+      propertyName = 'Total_scaled';
+    } else if ('Total' in geojsonData.features[0].properties) {
+      propertyName = 'Total';
+    }
+    console.log('Using property:', propertyName);
+
     map.addSource('ambulance_calls', {
       type: 'geojson',
       data: geojsonData
     });
 
     // --- Add color-coded layer based on RATE per 1000 residents ---
+    // Color scale will auto-adjust based on property
     map.addLayer({
       id: 'ambulance-layer',
       type: 'fill',
@@ -113,11 +128,11 @@ map.on('load', async () => {
         'fill-color': [
           'interpolate',
           ['linear'],
-          ['get', 'rate_per_1000'],
-          0, '#2ECC71',      // Green: low rate
-          0.5, '#F1C40F',    // Yellow: medium
-          1.0, '#E67E22',    // Orange: high
-          2.0, '#E74C3C'     // Red: very high
+          ['get', propertyName],
+          0, '#2ECC71',      // Green: low 
+          0.2, '#F1C40F',    // Yellow: medium
+          0.5, '#E67E22',    // Orange: high
+          1.0, '#E74C3C'     // Red: very high
         ],
         'fill-opacity': 0.6,
         'fill-outline-color': '#333'
@@ -134,11 +149,11 @@ map.on('load', async () => {
     
     slider.addEventListener('input', function(e) {
       const value = parseFloat(e.target.value);
-      sliderValue.textContent = value.toFixed(3);
+      sliderValue.textContent = value.toFixed(2);
       map.setFilter('ambulance-layer', ['>=', ['get', propertyName], value]);
     });
 
-    map.setFilter('ambulance-layer', ['>=', ['get', propertyName], 0.005]);
+    map.setFilter('ambulance-layer', ['>=', ['get', propertyName], 0]);
 
     console.log('Ambulance layer loaded successfully');
   } catch (err) {
