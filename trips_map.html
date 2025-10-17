@@ -92,7 +92,7 @@ map.on('load', async () => {
 
   try {
     // --- Load ambulance GeoJSON ---
-    const geojsonResponse = await fetch('http://localhost:8000/sensor_data/amsterdam_grid_wgs84_fine.geojson');
+    const geojsonResponse = await fetch('http://localhost:8000/sensor_data/amsterdam_calls.geojson');
     const geojsonData = await geojsonResponse.json();
     
     console.log('GeoJSON loaded');
