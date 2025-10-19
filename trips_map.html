@@ -2,15 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Amsterdam Trips + Ambulance Grid</title>
+  <title>Amsterdam Ambulance Calls - Heatmap</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <style>
-    body { margin:0; padding:0; }
+    body { margin:0; padding:0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     #map { position:absolute; top:0; bottom:0; width:100%; }
-    #toolbox {
+    
+    #controls {
       position: absolute;
       z-index: 1;
       top: 10px;
@@ -18,129 +19,193 @@
       background: rgba(255,255,255,0.95);
       padding: 15px;
       border-radius: 8px;
-      font-family: sans-serif;
-      min-width: 250px;
+      min-width: 280px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    #toolbox h3 {
+    
+    h3 {
       margin: 0 0 12px 0;
       font-size: 17px;
       color: #333;
       border-bottom: 2px solid #ddd;
       padding-bottom: 8px;
     }
-    .layer-control {
+    
+    .control-group {
       margin-bottom: 15px;
       padding-bottom: 15px;
       border-bottom: 1px solid #eee;
     }
-    .layer-control:last-child {
+    
+    .control-group:last-child {
       border-bottom: none;
       margin-bottom: 0;
       padding-bottom: 0;
     }
-    .layer-control > label {
+    
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+    }
+    
+    select, input[type="range"] {
+      width: 100%;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    
+    .checkbox-label {
       display: flex;
       align-items: center;
-      cursor: pointer;
       font-weight: 600;
-      color: #444;
-      font-size: 14px;
-    }
-    .layer-control input[type="checkbox"] {
-      margin-right: 8px;
       cursor: pointer;
+    }
+    
+    input[type="checkbox"] {
+      margin-right: 8px;
       width: 16px;
       height: 16px;
+      cursor: pointer;
     }
-    .slider-section {
-      margin-top: 12px;
-      padding: 10px;
-      background: rgba(0,0,0,0.03);
-      border-radius: 5px;
-      display: none;
-    }
-    .slider-section.active {
-      display: block;
-    }
+    
     .slider-info {
+      display: flex;
+      justify-content: space-between;
       font-size: 12px;
       color: #666;
-      margin-bottom: 8px;
-      font-weight: normal;
-    }
-    .slider-label {
-      font-size: 13px;
-      color: #444;
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-    .slider-value {
-      color: #E67E22;
-      font-weight: 700;
-    }
-    .slider-section input[type="range"] {
-      width: 100%;
-      margin: 8px 0;
-    }
-    .slider-range {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: #999;
       margin-top: 4px;
     }
-    #error {
-      position: absolute;
-      z-index: 2;
-      top: 10px;
-      right: 10px;
-      background: rgba(231,76,60,0.95);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-family: sans-serif;
-      display: none;
-      max-width: 300px;
+    
+    .time-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-top: 8px;
     }
+    
+    .time-button {
+      padding: 8px;
+      background: #f0f0f0;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    
+    .time-button:hover {
+      background: #e0e0e0;
+    }
+    
+    .time-button.active {
+      background: #3498db;
+      color: white;
+      border-color: #2980b9;
+    }
+    
+    #stats {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255,255,255,0.95);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-size: 13px;
+    }
+    
+    #stats h4 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #333;
+    }
+    
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+      min-width: 200px;
+    }
+    
+    .stat-label { color: #666; }
+    .stat-value { font-weight: 700; color: #E67E22; }
   </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div id="toolbox">
-  <h3>🗺️ Map Layers</h3>
+<div id="controls">
+  <h3>🚑 Ambulance Calls</h3>
   
-  <div class="layer-control">
-    <label>
+  <div class="control-group">
+    <label class="checkbox-label">
       <input type="checkbox" id="tripsCheckbox" checked>
-      Trip Routes
+      🚴 Bike Routes
     </label>
   </div>
   
-  <div class="layer-control">
-    <label>
-      <input type="checkbox" id="ambulanceCheckbox" checked>
-      Ambulance Calls Heatmap
+  <div class="control-group">
+    <label class="checkbox-label">
+      <input type="checkbox" id="heatmapCheckbox" checked>
+      Heatmap
     </label>
-    <div class="slider-section active" id="ambulanceSlider">
-      <div class="slider-info" id="dataInfo">Loading data...</div>
-      <div class="slider-label">
-        <span>Filter by threshold:</span>
-        <span class="slider-value" id="sliderValue">—</span>
-      </div>
-      <input type="range" id="densitySlider" min="0" max="1" step="0.01" value="0">
-      <div class="slider-range">
-        <span id="minLabel">0</span>
-        <span id="maxLabel">1</span>
-      </div>
+  </div>
+  
+  <div class="control-group">
+    <label class="checkbox-label">
+      <input type="checkbox" id="pointsCheckbox">
+      Individual Points
+    </label>
+  </div>
+  
+  <div class="control-group">
+    <label>Time Filter:</label>
+    <select id="timeFilter">
+      <option value="all">All Times</option>
+      <option value="night">🌙 Night (11pm-5am)</option>
+      <option value="morning">🌅 Morning (5am-11am)</option>
+      <option value="afternoon">☀️ Afternoon (11am-5pm)</option>
+      <option value="evening">🌆 Evening (5pm-11pm)</option>
+    </select>
+  </div>
+  
+  <div class="control-group">
+    <label>Heatmap Intensity:</label>
+    <input type="range" id="intensitySlider" min="0" max="1" step="0.1" value="0.5">
+    <div class="slider-info">
+      <span>Low</span>
+      <span>High</span>
+    </div>
+  </div>
+  
+  <div class="control-group">
+    <label>Heatmap Radius:</label>
+    <input type="range" id="radiusSlider" min="5" max="50" step="5" value="20">
+    <div class="slider-info">
+      <span>5px</span>
+      <span id="radiusValue">20px</span>
+      <span>50px</span>
     </div>
   </div>
 </div>
 
-<div id="error"></div>
+<div id="stats">
+  <h4>Statistics</h4>
+  <div class="stat-row">
+    <span class="stat-label">Showing:</span>
+    <span class="stat-value" id="statShowing">—</span>
+  </div>
+  <div class="stat-row">
+    <span class="stat-label">Total calls:</span>
+    <span class="stat-value" id="statTotal">—</span>
+  </div>
+</div>
 
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoibGF1cmFwb25vcmFuIiwiYSI6ImNtZ2U5d2U1dDFvazAybHM3a3Z1MWV0NmoifQ.lkO31BX5zlftfC2w412m2Q';
@@ -152,18 +217,12 @@ const map = new mapboxgl.Map({
   zoom: 11
 });
 
-function showError(msg) {
-  const errorDiv = document.getElementById('error');
-  errorDiv.textContent = msg;
-  errorDiv.style.display = 'block';
-  console.error(msg);
-}
+let ambulanceData = null;
 
 map.on('load', async () => {
-  let propertyName = 'Total';
   
+  // Load trips
   try {
-    // --- Load trips ---
     map.addSource('trips', {
       type: 'vector',
       url: 'http://localhost:8080/data/pmtiles.json'
@@ -186,145 +245,192 @@ map.on('load', async () => {
       });
     });
 
-    console.log('✅ Trip layers loaded:', tripLayers);
-    
-    const tripsCheckbox = document.getElementById('tripsCheckbox');
-    tripsCheckbox.addEventListener('change', (e) => {
+    document.getElementById('tripsCheckbox').addEventListener('change', (e) => {
       const visibility = e.target.checked ? 'visible' : 'none';
       tripLayers.forEach(layerId => {
         map.setLayoutProperty(layerId, 'visibility', visibility);
       });
     });
-    
   } catch (err) {
-    showError('Error loading trips: ' + err.message);
-    console.error(err);
+    console.warn('Trips not available:', err);
   }
 
+  // Load ambulance point data
   try {
-    // --- Load ambulance GeoJSON ---
-    const geojsonResponse = await fetch('http://localhost:8000/sensor_data/ambulance_calls.geojson');
-    const geojsonData = await geojsonResponse.json();
+    const response = await fetch('http://localhost:8000/sensor_data/amsterdam_ambulance_points_from_grid.geojson');
+    ambulanceData = await response.json();
     
-    console.log('✅ GeoJSON loaded');
-    console.log('📊 Sample feature:', geojsonData.features[0]);
-    console.log('📋 Available properties:', Object.keys(geojsonData.features[0].properties));
-
-    // Detect which property to use
-    const availableProps = geojsonData.features[0].properties;
-    if ('rate_per_1000' in availableProps) {
-      propertyName = 'rate_per_1000';
-    } else if ('Total_scaled' in availableProps) {
-      propertyName = 'Total_scaled';
-    } else if ('Total' in availableProps) {
-      propertyName = 'Total';
-    }
-    console.log('🎯 Using property:', propertyName);
+    console.log('✅ Loaded', ambulanceData.features.length, 'ambulance calls');
     
-    // Calculate min/max for slider
-    const values = geojsonData.features.map(f => f.properties[propertyName] || 0);
-    const minVal = Math.min(...values);
-    const maxVal = Math.max(...values);
-    console.log(`📈 ${propertyName} range: ${minVal.toFixed(4)} to ${maxVal.toFixed(4)}`);
-
-    map.addSource('ambulance_calls', {
+    map.addSource('ambulance-points', {
       type: 'geojson',
-      data: geojsonData
+      data: ambulanceData
     });
 
-    // Dynamic color scale based on property
-    const colorStops = propertyName === 'Total' 
-      ? [0, '#2ECC71', 0.3, '#F1C40F', 0.6, '#E67E22', 1.0, '#E74C3C']
-      : [0, '#2ECC71', 0.2, '#F1C40F', 0.5, '#E67E22', 1.0, '#E74C3C'];
-    
+    // Heatmap layer
     map.addLayer({
-      id: 'ambulance-layer',
-      type: 'fill',
-      source: 'ambulance_calls',
+      id: 'ambulance-heatmap',
+      type: 'heatmap',
+      source: 'ambulance-points',
       paint: {
-        'fill-color': [
+        // Increase weight as diameter increases
+        'heatmap-weight': [
           'interpolate',
           ['linear'],
-          ['get', propertyName],
-          ...colorStops
+          ['zoom'],
+          0, 0,
+          15, 1
         ],
-        'fill-opacity': 0.6,
-        'fill-outline-color': '#333'
+        // Increase intensity as zoom level increases
+        'heatmap-intensity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          0, 0.5,
+          15, 1
+        ],
+        // Color ramp for heatmap
+        'heatmap-color': [
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0, 'rgba(33,102,172,0)',
+          0.2, 'rgb(103,169,207)',
+          0.4, 'rgb(209,229,240)',
+          0.6, 'rgb(253,219,199)',
+          0.8, 'rgb(239,138,98)',
+          1, 'rgb(178,24,43)'
+        ],
+        // Radius of influence of one point in pixels
+        'heatmap-radius': 20,
+        // Transition from heatmap to circle layer at zoom level 14
+        'heatmap-opacity': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          7, 1,
+          14, 0.5
+        ]
       }
     });
 
-    const bbox = turf.bbox(geojsonData);
-    map.fitBounds(bbox, { padding: 20 });
-
-    // --- CONFIGURE SLIDER WITH ACTUAL DATA ---
-    const slider = document.getElementById('densitySlider');
-    const sliderValue = document.getElementById('sliderValue');
-    const dataInfo = document.getElementById('dataInfo');
-    const minLabel = document.getElementById('minLabel');
-    const maxLabel = document.getElementById('maxLabel');
-    
-    // Set slider to actual data range
-    slider.min = minVal;
-    slider.max = maxVal;
-    slider.step = (maxVal - minVal) / 200; // 200 steps for smooth control
-    slider.value = minVal;
-    
-    // Create user-friendly labels
-    const labels = {
-      'rate_per_1000': {
-        info: '📊 Ambulance calls per 1,000 residents',
-        unit: ' calls/1k'
-      },
-      'Total_scaled': {
-        info: '📊 Scaled density value (0-1)',
-        unit: ''
-      },
-      'Total': {
-        info: '📊 Total ambulance calls in area',
-        unit: ' calls'
+    // Circle layer for individual points
+    map.addLayer({
+      id: 'ambulance-points-layer',
+      type: 'circle',
+      source: 'ambulance-points',
+      paint: {
+        'circle-radius': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          7, 1,
+          14, 4
+        ],
+        'circle-color': '#E74C3C',
+        'circle-opacity': 0,
+        'circle-stroke-width': 1,
+        'circle-stroke-color': '#fff'
       }
-    };
-    
-    const label = labels[propertyName] || { info: '📊 Density value', unit: '' };
-    dataInfo.textContent = label.info;
-    minLabel.textContent = minVal.toFixed(2) + label.unit;
-    maxLabel.textContent = maxVal.toFixed(2) + label.unit;
-    
-    // Update display value
-    function updateSliderDisplay(value) {
-      sliderValue.textContent = value.toFixed(3) + label.unit;
-    }
-    
-    updateSliderDisplay(minVal);
-    
-    slider.addEventListener('input', function(e) {
-      const value = parseFloat(e.target.value);
-      updateSliderDisplay(value);
-      map.setFilter('ambulance-layer', ['>=', ['get', propertyName], value]);
     });
 
-    map.setFilter('ambulance-layer', ['>=', ['get', propertyName], minVal]);
+    // Fit map to data
+    const bbox = turf.bbox(ambulanceData);
+    map.fitBounds(bbox, { padding: 50 });
 
-    console.log('✅ Ambulance layer loaded successfully');
+    // Setup controls
+    setupControls();
+    updateStats();
 
-    // Toggle visibility
-    const ambulanceCheckbox = document.getElementById('ambulanceCheckbox');
-    const ambulanceSlider = document.getElementById('ambulanceSlider');
-    
-    ambulanceCheckbox.addEventListener('change', (e) => {
-      const isChecked = e.target.checked;
-      map.setLayoutProperty('ambulance-layer', 'visibility', isChecked ? 'visible' : 'none');
-      ambulanceSlider.classList.toggle('active', isChecked);
-    });
+    console.log('✅ Map ready');
 
   } catch (err) {
-    showError('Error loading ambulance data: ' + err.message);
-    console.error(err);
+    console.error('Error loading ambulance data:', err);
   }
 });
 
-map.on('error', (e) => {
-  showError('Map error: ' + (e.error ? e.error.message : 'Unknown error'));
+function setupControls() {
+  // Heatmap toggle
+  document.getElementById('heatmapCheckbox').addEventListener('change', (e) => {
+    map.setLayoutProperty('ambulance-heatmap', 'visibility', 
+      e.target.checked ? 'visible' : 'none');
+  });
+
+  // Points toggle
+  document.getElementById('pointsCheckbox').addEventListener('change', (e) => {
+    map.setPaintProperty('ambulance-points-layer', 'circle-opacity', 
+      e.target.checked ? 0.8 : 0);
+  });
+
+  // Time filter
+  document.getElementById('timeFilter').addEventListener('change', (e) => {
+    const period = e.target.value;
+    
+    if (period === 'all') {
+      map.setFilter('ambulance-heatmap', null);
+      map.setFilter('ambulance-points-layer', null);
+    } else {
+      const filter = ['==', ['get', 'period'], period];
+      map.setFilter('ambulance-heatmap', filter);
+      map.setFilter('ambulance-points-layer', filter);
+    }
+    
+    updateStats();
+  });
+
+  // Intensity slider
+  document.getElementById('intensitySlider').addEventListener('input', (e) => {
+    const value = parseFloat(e.target.value);
+    map.setPaintProperty('ambulance-heatmap', 'heatmap-intensity', value);
+  });
+
+  // Radius slider
+  document.getElementById('radiusSlider').addEventListener('input', (e) => {
+    const value = parseInt(e.target.value);
+    document.getElementById('radiusValue').textContent = value + 'px';
+    map.setPaintProperty('ambulance-heatmap', 'heatmap-radius', value);
+  });
+}
+
+function updateStats() {
+  if (!ambulanceData) return;
+  
+  const timeFilter = document.getElementById('timeFilter').value;
+  
+  let filteredCount = ambulanceData.features.length;
+  if (timeFilter !== 'all') {
+    filteredCount = ambulanceData.features.filter(
+      f => f.properties.period === timeFilter
+    ).length;
+  }
+  
+  document.getElementById('statShowing').textContent = filteredCount;
+  document.getElementById('statTotal').textContent = ambulanceData.features.length;
+}
+
+// Click on points to show info
+map.on('click', 'ambulance-points-layer', (e) => {
+  const props = e.features[0].properties;
+  
+  new mapboxgl.Popup()
+    .setLngLat(e.lngLat)
+    .setHTML(`
+      <strong>Ambulance Call</strong><br>
+      📍 ${props.location}<br>
+      🕐 ${props.time}<br>
+      📅 ${props.date}<br>
+      ${props.message ? `💬 ${props.message}` : ''}
+    `)
+    .addTo(map);
+});
+
+// Change cursor on hover
+map.on('mouseenter', 'ambulance-points-layer', () => {
+  map.getCanvas().style.cursor = 'pointer';
+});
+
+map.on('mouseleave', 'ambulance-points-layer', () => {
+  map.getCanvas().style.cursor = '';
 });
 </script>
 </body>
