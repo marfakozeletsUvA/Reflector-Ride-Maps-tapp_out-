@@ -8,7 +8,7 @@ PMTILES_FILE = os.path.join(DATA_ROOT, "trips.pmtiles")
 geojson_files = []
 for root, dirs, files in os.walk(DATA_ROOT):
     for f in files:
-        if f.endswith("_clean.geojson"):
+        if f.endswith("_processed.geojson"):
             geojson_files.append(os.path.join(root, f))
 
 if geojson_files:
