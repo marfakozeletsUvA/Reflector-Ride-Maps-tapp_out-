@@ -5,7 +5,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Configuration
-WHEEL_DIAMETER_MM = 660  # 26 inches
+WHEEL_DIAMETER_MM = 711  # 26 inches
 WHEEL_CIRCUMFERENCE_M = (WHEEL_DIAMETER_MM / 1000) * math.pi  # ~2.073 meters
 SAMPLE_RATE_HZ = 50
 SECONDS_PER_SAMPLE = 1 / SAMPLE_RATE_HZ  # 0.02 seconds
