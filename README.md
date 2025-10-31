@@ -20,7 +20,7 @@ Reflector-Ride-Maps/
 │   ├── trips.pmtiles               # Compressed trip data for map
 ├── csv_to_geojson_converter.py     # Step 1: Convert CSVs to GeoJSON
 ├── combined_processor.py           # Step 2: Calculate speeds from sensor data
-├── build_pmtiles.py                # Step 4: Build PMTiles for web
+├── build_pmtiles.py                # Step 3: Build PMTiles for web
 ├── index.html                      # Main visualization page
 ├── app.js                          # Map logic and interactions
 ├── config.js                       # Configuration (uses .env)
