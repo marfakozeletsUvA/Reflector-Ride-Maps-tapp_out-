@@ -98,7 +98,7 @@ python build_pmtiles.py
 - Uses Tippecanoe to compress processed GeoJSON into PMTiles format
 - PMTiles = efficient vector tiles for web maps
 - Preserves `Speed`, `marker`, and `trip_id` properties
-- **Output:** `public/trips.pmtiles`
+- **Output:** `trips.pmtiles`
 
 **Why PMTiles?**
 - Efficient: ~90% smaller than GeoJSON
