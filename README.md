@@ -6,7 +6,6 @@ A bike sensor data visualization tool that processes GPS and wheel rotation data
 
 This project takes raw CSV files from bike sensors and transforms them into:
 - **Individual trip visualizations** with speed-colored segments
-- **Aggregated route maps** showing average speeds across multiple trips
 - **Interactive web visualization** powered by MapLibre GL JS
 
 ## 🗂️ Project Structure
