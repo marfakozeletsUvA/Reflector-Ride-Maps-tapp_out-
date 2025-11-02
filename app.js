@@ -19,8 +19,7 @@ let tripLayers = [];
 let speedMode = 'gradient';
 let showSpeedColors = false;
 let selectedTrip = null;
-let tripStatsCalculated = false;
-let allTripData = {}; // Store complete data for each trip
+let tripsMetadata = null; // Store metadata
 
 // Default orange color for routes
 const DEFAULT_COLOR = '#FF6600';
@@ -55,12 +54,143 @@ function getSpeedColorExpression(mode) {
   }
 }
 
+// Load metadata
+async function loadMetadata() {
+  // Try multiple possible paths
+  const possiblePaths = [
+    `${CONFIG.DATA_URL}/trips_metadata.json`,
+    '/trips_metadata.json',
+    './trips_metadata.json',
+    'trips_metadata.json'
+  ];
+  
+  for (const path of possiblePaths) {
+    try {
+      console.log('Trying to load metadata from:', path);
+      const response = await fetch(path);
+      if (response.ok) {
+        tripsMetadata = await response.json();
+        console.log('✅ Loaded trip metadata from', path, 'for', Object.keys(tripsMetadata).length, 'trips');
+        return tripsMetadata;
+      }
+    } catch (err) {
+      console.log('❌ Failed to load from', path);
+    }
+  }
+  
+  console.warn('⚠️ Could not load metadata from any path. Please place trips_metadata.json in your project root or /Reflector-Ride-Maps-V2/ directory');
+  return null;
+}
+
+// Parse metadata for a specific trip
+function getTripStats(tripId) {
+  if (!tripsMetadata) {
+    console.warn('No metadata loaded');
+    return null;
+  }
+  
+  // Remove "_processed" suffix if present
+  const cleanTripId = tripId.replace(/_processed$/i, '');
+  
+  if (!tripsMetadata[cleanTripId]) {
+    console.warn('No metadata for trip:', tripId, '(cleaned:', cleanTripId + ')');
+    return null;
+  }
+  
+  // Handle nested metadata structure
+  const tripData = tripsMetadata[cleanTripId];
+  const meta = tripData.metadata || tripData; // Support both nested and flat structures
+  
+  // Parse the GNSS line which has the actual stats
+  // Format: ",Duration,Stops,Dist km,AVG km/h,AVGWOS km/h,MAX km/h,..."
+  // Example: ",14:50,01:12,4.196,17,18,29,,,,,0"
+  const gnssLine = meta['GNSS'];
+  if (!gnssLine) {
+    console.warn('No GNSS data for trip:', cleanTripId);
+    return null;
+  }
+  
+  const parts = gnssLine.split(',');
+  
+  return {
+    duration: parts[1], // "14:50"
+    stops: parts[2], // "01:12"
+    distance: parseFloat(parts[3]) || 0, // 4.196 km
+    avgSpeed: parseFloat(parts[4]) || 0, // 17 km/h
+    avgSpeedWOS: parseFloat(parts[5]) || 0, // 18 km/h (without stops)
+    maxSpeed: parseFloat(parts[6]) || 0, // 29 km/h
+    elevation: parseFloat(parts[11]) || 0 // 0 m
+  };
+}
+
+// Calculate aggregate stats from all trips
+function calculateAggregateStats() {
+  if (!tripsMetadata) {
+    console.warn('No metadata available for aggregate stats');
+    return null;
+  }
+  
+  let totalDistance = 0;
+  let totalTime = 0; // in seconds
+  let totalAvgSpeed = 0;
+  let tripCount = 0;
+  
+  Object.keys(tripsMetadata).forEach(tripId => {
+    const stats = getTripStats(tripId);
+    if (stats) {
+      totalDistance += stats.distance;
+      
+      // Parse duration "HH:MM" or "MM:SS" format
+      const [part1, part2] = stats.duration.split(':').map(Number);
+      const durationSeconds = (part1 * 60 + part2) * 60; // Assuming MM:SS format
+      totalTime += durationSeconds;
+      
+      // Sum up the average speeds from metadata
+      totalAvgSpeed += stats.avgSpeed;
+      
+      tripCount++;
+    }
+  });
+  
+  // Average of the individual trip average speeds
+  const avgSpeed = tripCount > 0 ? (totalAvgSpeed / tripCount) : 0;
+  
+  return {
+    tripCount,
+    totalDistance: totalDistance.toFixed(1),
+    totalTime: formatDuration(totalTime),
+    avgSpeed: avgSpeed.toFixed(1)
+  };
+}
+
+// Format seconds into readable duration
+function formatDuration(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+// Parse duration string to seconds
+function parseDurationToSeconds(duration) {
+  if (!duration) return 0;
+  const [part1, part2] = duration.split(':').map(Number);
+  // Assuming format is MM:SS
+  return part1 * 60 + part2;
+}
+
 map.on('error', (e) => {
   console.error('❌ Map error:', e);
 });
 
 map.on('load', async () => {
   console.log('✅ Map loaded');
+  
+  // Load metadata first
+  await loadMetadata();
   
   try {
     console.log('📡 Loading bike trips from:', CONFIG.PMTILES_URL);
@@ -69,7 +199,8 @@ map.on('load', async () => {
     const protocol = new pmtiles.Protocol();
     mapboxgl.addProtocol('pmtiles', protocol.tile);
     
-    const pmtilesUrl = `${window.location.origin}${CONFIG.PMTILES_URL}`;
+    // Use relative path for GitHub Pages
+    const pmtilesUrl = CONFIG.PMTILES_URL;
     const p = new pmtiles.PMTiles(pmtilesUrl);
     protocol.add(p);
     
@@ -114,8 +245,8 @@ map.on('load', async () => {
     setupControls();
     setupClickHandlers();
     
-    // Load complete trip data from all tiles
-    loadAllTripData(p);
+    // Update stats from metadata
+    updateStatsFromMetadata();
 
   } catch (err) {
     console.error('❌ Error loading trips:', err);
@@ -203,31 +334,26 @@ function setupClickHandlers() {
       const tripName = layerId.replace(/_/g, ' ').replace(/processed/gi, '').trim();
       document.getElementById('selectedTrip').textContent = tripName;
       
-      // Use pre-calculated trip data if available
-      let totalDistance = 0;
-      let totalTime = 0;
+      // Get stats from metadata
+      const stats = getTripStats(layerId);
       
-      if (allTripData[layerId]) {
-        totalDistance = allTripData[layerId].distance;
-        totalTime = allTripData[layerId].time;
-        console.log(`Using cached data for ${layerId}: ${totalDistance}m, ${totalTime}s`);
+      let distanceKm, avgSpeed, maxSpeed, durationFormatted;
+      
+      if (stats) {
+        // Use metadata stats
+        distanceKm = stats.distance.toFixed(2);
+        avgSpeed = stats.avgSpeed.toFixed(1);
+        maxSpeed = stats.maxSpeed.toFixed(1);
+        durationFormatted = stats.duration;
+        console.log(`Using metadata for ${layerId}:`, stats);
       } else {
-        // Fallback to querying rendered features
-        const features = map.queryRenderedFeatures({ layers: [layerId] });
-        features.forEach(feature => {
-          totalDistance += feature.properties.gps_distance_m || 0;
-          totalTime += feature.properties.time_diff_s || 0;
-        });
-        console.log(`Queried ${features.length} features for ${layerId}`);
+        // Fallback to basic display
+        distanceKm = '—';
+        avgSpeed = '—';
+        maxSpeed = '—';
+        durationFormatted = '—';
+        console.warn('No metadata available for', layerId);
       }
-      
-      // Calculate stats
-      const distanceKm = (totalDistance / 1000).toFixed(2);
-      const avgSpeed = totalTime > 0 ? ((totalDistance / 1000) / (totalTime / 3600)).toFixed(1) : 0;
-      
-      const durationMinutes = Math.floor(totalTime / 60);
-      const durationSeconds = Math.round(totalTime % 60);
-      const durationFormatted = `${durationMinutes}:${durationSeconds.toString().padStart(2, '0')}`;
       
       // Show popup
       const popupTripName = layerId.replace(/_/g, ' ').replace(/processed/gi, '').trim();
@@ -237,6 +363,7 @@ function setupClickHandlers() {
           <strong>${popupTripName}</strong><br>
           🚴 Speed at point: ${speed} km/h<br>
           📊 Average speed: ${avgSpeed} km/h<br>
+          🏁 Max speed: ${maxSpeed} km/h<br>
           📍 Total distance: ${distanceKm} km<br>
           ⏱️ Duration: ${durationFormatted}
         `)
@@ -271,135 +398,23 @@ function setupClickHandlers() {
   });
 }
 
-async function loadAllTripData(pmtiles) {
-  console.log('Loading all trip data from PMTiles...');
-  
-  // PMTiles doesn't have a direct way to get all features
-  // So we'll calculate on demand when zoomed out
-  // For now, just set trip count
-  document.getElementById('statTrips').textContent = tripLayers.length;
-  
-  // Try to calculate by zooming way out
-  const originalCenter = map.getCenter();
-  const originalZoom = map.getZoom();
-  
-  // Get bounds from header
-  try {
-    const header = await pmtiles.getHeader();
-    const center = [(header.minLon + header.maxLon) / 2, (header.minLat + header.maxLat) / 2];
-    
-    map.jumpTo({ center, zoom: 10 });
-    
-    setTimeout(() => {
-      console.log('Calculating stats from zoomed out view...');
-      let totalDistance = 0;
-      let totalTime = 0;
-      
-      tripLayers.forEach(layerId => {
-        const features = map.queryRenderedFeatures({ layers: [layerId] });
-        
-        let tripDistance = 0;
-        let tripTime = 0;
-        
-        features.forEach(feature => {
-          tripDistance += feature.properties.gps_distance_m || 0;
-          tripTime += feature.properties.time_diff_s || 0;
-        });
-        
-        // Store this trip's data
-        allTripData[layerId] = { distance: tripDistance, time: tripTime };
-        totalDistance += tripDistance;
-        totalTime += tripTime;
-        
-        console.log(`${layerId}: ${tripDistance.toFixed(0)}m, ${tripTime.toFixed(0)}s`);
-      });
-      
-      console.log(`Total: ${totalDistance.toFixed(0)}m, ${totalTime.toFixed(0)}s`);
-      
-      // Update stats
-      const totalDistanceKm = (totalDistance / 1000).toFixed(1);
-      const avgSpeed = totalTime > 0 ? ((totalDistance / 1000) / (totalTime / 3600)).toFixed(1) : 0;
-      
-      const totalHours = Math.floor(totalTime / 3600);
-      const totalMinutes = Math.floor((totalTime % 3600) / 60);
-      const totalTimeFormatted = totalHours > 0 
-        ? `${totalHours}h ${totalMinutes}m` 
-        : `${totalMinutes}m`;
-      
-      document.getElementById('statDistance').textContent = `${totalDistanceKm} km`;
-      document.getElementById('statAvgSpeed').textContent = `${avgSpeed} km/h`;
-      document.getElementById('statTotalTime').textContent = totalTimeFormatted;
-      
-      // Return to original view
-      map.jumpTo({ center: originalCenter, zoom: originalZoom });
-    }, 1500);
-    
-  } catch (err) {
-    console.error('Error loading trip data:', err);
+function updateStatsFromMetadata() {
+  if (!tripsMetadata) {
+    console.warn('No metadata available');
     document.getElementById('statTrips').textContent = tripLayers.length;
+    return;
   }
-}
-
-function calculateAllTripStats() {
-  console.log('Calculating stats for all trips...');
   
-  let totalDistance = 0;
-  let totalTime = 0;
-  let tripCount = 0;
+  const aggregateStats = calculateAggregateStats();
   
-  // Pan around to load all tiles, then calculate
-  const originalCenter = map.getCenter();
-  const originalZoom = map.getZoom();
-  
-  // Zoom out to load more tiles
-  map.setZoom(11);
-  
-  setTimeout(() => {
-    tripLayers.forEach(layerId => {
-      const features = map.queryRenderedFeatures({ layers: [layerId] });
-      
-      let tripDistance = 0;
-      let tripTime = 0;
-      
-      features.forEach(feature => {
-        tripDistance += feature.properties.gps_distance_m || 0;
-        tripTime += feature.properties.time_diff_s || 0;
-      });
-      
-      if (tripDistance > 0 || tripTime > 0) {
-        totalDistance += tripDistance;
-        totalTime += tripTime;
-        tripCount++;
-        console.log(`${layerId}: ${tripDistance}m, ${tripTime}s`);
-      }
-    });
-    
-    console.log(`Total: ${tripCount} trips, ${totalDistance}m, ${totalTime}s`);
-    
-    // Update the UI - this won't change after initial calculation
-    const totalDistanceKm = (totalDistance / 1000).toFixed(1);
-    const avgSpeed = totalTime > 0 ? ((totalDistance / 1000) / (totalTime / 3600)).toFixed(1) : 0;
-    
-    const totalHours = Math.floor(totalTime / 3600);
-    const totalMinutes = Math.floor((totalTime % 3600) / 60);
-    const totalTimeFormatted = totalHours > 0 
-      ? `${totalHours}h ${totalMinutes}m` 
-      : `${totalMinutes}m`;
-    
+  if (aggregateStats) {
+    document.getElementById('statTrips').textContent = aggregateStats.tripCount;
+    document.getElementById('statDistance').textContent = `${aggregateStats.totalDistance} km`;
+    document.getElementById('statAvgSpeed').textContent = `${aggregateStats.avgSpeed} km/h`;
+    document.getElementById('statTotalTime').textContent = aggregateStats.totalTime;
+    console.log('✅ Stats updated from metadata:', aggregateStats);
+  } else {
     document.getElementById('statTrips').textContent = tripLayers.length;
-    document.getElementById('statDistance').textContent = `${totalDistanceKm} km`;
-    document.getElementById('statAvgSpeed').textContent = `${avgSpeed} km/h`;
-    document.getElementById('statTotalTime').textContent = totalTimeFormatted;
-    
-    // Restore original view
-    map.setCenter(originalCenter);
-    map.setZoom(originalZoom);
-    
-    tripStatsCalculated = true;
-  }, 1000);
-}
-
-function updateStats() {
-  // This function is no longer needed since stats are calculated once
-  document.getElementById('statTrips').textContent = tripLayers.length;
+    console.warn('Could not calculate aggregate stats');
+  }
 }

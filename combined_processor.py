@@ -5,8 +5,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # Configuration
-WHEEL_DIAMETER_MM = 711  # 26 inches
-WHEEL_CIRCUMFERENCE_M = (WHEEL_DIAMETER_MM / 1000) * math.pi  # ~2.073 meters
+DEFAULT_WHEEL_DIAMETER_MM = 711  # 26 inches - fallback only
 SAMPLE_RATE_HZ = 50
 SECONDS_PER_SAMPLE = 1 / SAMPLE_RATE_HZ  # 0.02 seconds
 
@@ -78,6 +77,26 @@ def extract_metadata_and_features(data):
     
     return features, metadata
 
+def get_wheel_diameter_from_metadata(metadata):
+    """Extract wheel diameter from metadata, return in mm"""
+    if not metadata:
+        print(f"    ⚠️  No metadata, using default wheel diameter: {DEFAULT_WHEEL_DIAMETER_MM}mm")
+        return DEFAULT_WHEEL_DIAMETER_MM
+    
+    # Try to get wheel diameter from Wheel mm field
+    wheel_mm = metadata.get('Wheel mm')
+    if wheel_mm:
+        try:
+            diameter = float(wheel_mm)
+            print(f"    ✓ Using wheel diameter from metadata: {diameter}mm")
+            return diameter
+        except (ValueError, TypeError):
+            pass
+    
+    # Fallback to default
+    print(f"    ⚠️  Wheel diameter not found in metadata, using default: {DEFAULT_WHEEL_DIAMETER_MM}mm")
+    return DEFAULT_WHEEL_DIAMETER_MM
+
 def process_geojson_file(filepath, trip_id, debug=False):
     """Process a single GeoJSON file: clean, calculate speeds, create segments"""
     try:
@@ -93,7 +112,14 @@ def process_geojson_file(filepath, trip_id, debug=False):
         if not features:
             return None, metadata
         
+        # Get wheel diameter from metadata
+        wheel_diameter_mm = get_wheel_diameter_from_metadata(metadata)
+        wheel_circumference_m = (wheel_diameter_mm / 1000) * math.pi
+        
         if debug:
+            print(f"\n  DEBUG - Wheel configuration:")
+            print(f"    Diameter: {wheel_diameter_mm}mm")
+            print(f"    Circumference: {wheel_circumference_m:.3f}m")
             print(f"\n  DEBUG - First feature properties:")
             for key, value in features[0]['properties'].items():
                 print(f"    {key}: {value} (type: {type(value).__name__})")
@@ -113,7 +139,7 @@ def process_geojson_file(filepath, trip_id, debug=False):
                 continue
             
             samples_value = props.get('Samples', 0)
-            samples_int = safe_int(samples_value, 0)  # changed default from idx → 0
+            samples_int = safe_int(samples_value, 0)
             
             points.append({
                 'lon': float(lon),
@@ -156,24 +182,24 @@ def process_geojson_file(filepath, trip_id, debug=False):
             
             end_point = points[j]
             
-            # ✅ Prefer actual time difference if timestamps exist
+            # Prefer actual time difference if timestamps exist
             if start_point['time'] and end_point['time']:
                 time_diff_seconds = (end_point['time'] - start_point['time']).total_seconds()
             else:
                 sample_diff = end_point['samples'] - start_point['samples']
                 time_diff_seconds = sample_diff * SECONDS_PER_SAMPLE
             
-            # ✅ Skip unrealistic or zero durations
+            # Skip unrealistic or zero durations
             if time_diff_seconds <= 0 or time_diff_seconds > 600:
                 i = j
                 continue
             
-            # Calculate speed from wheel rotations
+            # Calculate speed from wheel rotations using trip-specific wheel diameter
             hrot_diff = end_point['hrot'] - start_point['hrot']
             
             if hrot_diff > 0 and time_diff_seconds > 0:
                 revolutions = hrot_diff / 2.0
-                distance_m = revolutions * WHEEL_CIRCUMFERENCE_M
+                distance_m = revolutions * wheel_circumference_m
                 speed_ms = distance_m / time_diff_seconds
                 speed_kmh = speed_ms * 3.6
             else:
@@ -184,7 +210,7 @@ def process_geojson_file(filepath, trip_id, debug=False):
                 end_point['lon'], end_point['lat']
             )
             
-            # ✅ Skip unrealistic GPS jumps
+            # Skip unrealistic GPS jumps
             if gps_distance > 1000:
                 i = j
                 continue
@@ -192,9 +218,9 @@ def process_geojson_file(filepath, trip_id, debug=False):
             if debug and len(new_features) < 3:
                 print(f"  DEBUG - Speed calc for segment {len(new_features)}:")
                 print(f"    Points {i} to {j} (skipped {j-i-1} stationary)")
-                print(f"    hrot_diff={hrot_diff}, speed_kmh={speed_kmh:.1f}")
+                print(f"    hrot_diff={hrot_diff}, distance={distance_m:.2f}m, speed_kmh={speed_kmh:.1f}")
             
-            # ✅ Cap speed more safely (40 km/h)
+            # Cap speed more safely (40 km/h)
             if speed_kmh > 40:
                 speed_kmh = 40
             
@@ -219,7 +245,8 @@ def process_geojson_file(filepath, trip_id, debug=False):
                         'sample_diff': end_point['samples'] - start_point['samples'],
                         'time_diff_s': round(time_diff_seconds, 3),
                         'gps_distance_m': round(gps_distance, 1),
-                        'original_speed': start_point['original_speed']
+                        'original_speed': start_point['original_speed'],
+                        'wheel_diameter_mm': wheel_diameter_mm
                     }
                 }
                 new_features.append(new_feature)
