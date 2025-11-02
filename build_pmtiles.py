@@ -2,7 +2,7 @@ import os
 import subprocess
 
 DATA_ROOT = "processed_sensor_data"  # Changed from "sensor_data"
-PMTILES_FILE = os.path.join(DATA_ROOT, "trips.pmtiles")
+PMTILES_FILE = "trips.pmtiles"
 
 # Gather all cleaned GeoJSON files
 geojson_files = []
