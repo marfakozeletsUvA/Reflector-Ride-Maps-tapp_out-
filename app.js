@@ -182,6 +182,53 @@ function parseDurationToSeconds(duration) {
   return part1 * 60 + part2;
 }
 
+// Reset selection - show all trips normally
+function resetSelection() {
+  console.log('Resetting selection');
+  selectedTrip = null;
+  
+  // Reset all layers to normal appearance
+  tripLayers.forEach(layerId => {
+    try {
+      map.setPaintProperty(layerId, 'line-opacity', 0.7);
+      map.setPaintProperty(layerId, 'line-width', 3);
+    } catch (err) {
+      console.error('Error resetting layer:', layerId, err);
+    }
+  });
+  
+  // Hide reset button
+  document.getElementById('resetButton').style.display = 'none';
+  
+  // Hide selected trip row
+  document.getElementById('selectedTripRow').style.display = 'none';
+  
+  // Show aggregate stats rows
+  document.getElementById('statTripRow').style.display = 'flex';
+  document.getElementById('statDistanceRow').style.display = 'flex';
+  document.getElementById('statAvgSpeedRow').style.display = 'flex';
+  document.getElementById('statTotalTimeRow').style.display = 'flex';
+}
+
+// Show selection UI
+function showSelection(layerId) {
+  console.log('Showing selection for:', layerId);
+  
+  // Show reset button
+  document.getElementById('resetButton').style.display = 'block';
+  
+  // Hide aggregate stats
+  document.getElementById('statTripRow').style.display = 'none';
+  document.getElementById('statDistanceRow').style.display = 'none';
+  document.getElementById('statAvgSpeedRow').style.display = 'none';
+  document.getElementById('statTotalTimeRow').style.display = 'none';
+  
+  // Show selected trip row
+  document.getElementById('selectedTripRow').style.display = 'flex';
+  const tripName = layerId.replace(/_/g, ' ').replace(/processed/gi, '').trim();
+  document.getElementById('selectedTrip').textContent = tripName;
+}
+
 map.on('error', (e) => {
   console.error('❌ Map error:', e);
 });
@@ -254,6 +301,14 @@ map.on('load', async () => {
 });
 
 function setupControls() {
+  // Reset button handler
+  const resetButton = document.getElementById('resetButton');
+  if (resetButton) {
+    resetButton.addEventListener('click', () => {
+      resetSelection();
+    });
+  }
+  
   // Speed colors toggle
   const speedColorsCheckbox = document.getElementById('speedColorsCheckbox');
   if (!speedColorsCheckbox) {
@@ -329,10 +384,8 @@ function setupClickHandlers() {
         }
       });
       
-      // Update stats
-      document.getElementById('selectedTripRow').style.display = 'flex';
-      const tripName = layerId.replace(/_/g, ' ').replace(/processed/gi, '').trim();
-      document.getElementById('selectedTrip').textContent = tripName;
+      // Update UI to show selection
+      showSelection(layerId);
       
       // Get stats from metadata
       const stats = getTripStats(layerId);
@@ -383,17 +436,7 @@ function setupClickHandlers() {
   map.on('click', (e) => {
     console.log('Map background clicked, defaultPrevented:', e.defaultPrevented);
     if (!e.defaultPrevented && selectedTrip) {
-      console.log('Resetting from background click');
-      selectedTrip = null;
-      tripLayers.forEach(layerId => {
-        try {
-          map.setPaintProperty(layerId, 'line-opacity', 0.7);
-          map.setPaintProperty(layerId, 'line-width', 3);
-        } catch (err) {
-          console.error('Error resetting layer:', layerId, err);
-        }
-      });
-      document.getElementById('selectedTripRow').style.display = 'none';
+      resetSelection();
     }
   });
 }

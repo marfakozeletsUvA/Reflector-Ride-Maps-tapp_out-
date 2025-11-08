@@ -17,6 +17,8 @@
 <div id="map"></div>
 
 <div id="controls">
+  <button id="resetButton">↩ Reset View</button>
+  
   <h3>🚴 Bike Routes</h3>
   
   <div class="control-group">
@@ -26,7 +28,7 @@
     </label>
   </div>
   
-  <div class="radio-group" id="speedModeGroup" style="display: none;">
+  <div class="radio-group" id="speedModeGroup">
     <label class="radio-label">
       <input type="radio" name="speedMode" value="gradient" checked>
       Smooth Gradient
@@ -40,29 +42,29 @@
 
 <div id="stats">
   <h4>Trip Info</h4>
-  <div class="stat-row">
+  <div class="stat-row" id="statTripRow">
     <span class="stat-label">Total trips:</span>
     <span class="stat-value" id="statTrips">—</span>
   </div>
-  <div class="stat-row">
+  <div class="stat-row" id="statDistanceRow">
     <span class="stat-label">Total distance:</span>
     <span class="stat-value" id="statDistance">—</span>
   </div>
-  <div class="stat-row">
+  <div class="stat-row" id="statAvgSpeedRow">
     <span class="stat-label">Average speed:</span>
     <span class="stat-value" id="statAvgSpeed">—</span>
   </div>
-  <div class="stat-row">
+  <div class="stat-row" id="statTotalTimeRow">
     <span class="stat-label">Total time:</span>
     <span class="stat-value" id="statTotalTime">—</span>
   </div>
-  <div class="stat-row" id="selectedTripRow" style="display: none;">
+  <div class="stat-row" id="selectedTripRow">
     <span class="stat-label">Selected:</span>
     <span class="stat-value" id="selectedTrip">—</span>
   </div>
 </div>
 
-<div class="legend" id="speedLegend" style="display: none;">
+<div class="legend" id="speedLegend">
   <h4>Speed (km/h)</h4>
   <div class="speed-legend-item">
     <div class="speed-color-box" style="background: #808080;"></div>
