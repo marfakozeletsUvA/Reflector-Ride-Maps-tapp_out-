@@ -120,8 +120,8 @@ input[type="radio"] {
 #resetButton {
   width: 100%;
   padding: 10px;
-  margin-bottom: 15px;
-  margin-top: 10px;
+  margin-bottom: 5px;
+  margin-top: 20px;
   background: #E67E22;
   color: white;
   border: none;
