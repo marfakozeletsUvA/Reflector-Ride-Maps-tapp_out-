@@ -20,6 +20,7 @@ let speedMode = 'gradient';
 let showSpeedColors = false;
 let selectedTrip = null;
 let tripsMetadata = null; // Store metadata
+let currentPopup = null; // Track the current popup
 
 // Default orange color for routes
 const DEFAULT_COLOR = '#FF6600';
@@ -186,6 +187,12 @@ function parseDurationToSeconds(duration) {
 function resetSelection() {
   console.log('Resetting selection');
   selectedTrip = null;
+  
+  // Close any open popup
+  if (currentPopup) {
+    currentPopup.remove();
+    currentPopup = null;
+  }
   
   // Reset all layers to normal appearance
   tripLayers.forEach(layerId => {
@@ -363,6 +370,11 @@ function setupClickHandlers() {
         e.originalEvent.stopPropagation();
       }
       
+      // Close any existing popup
+      if (currentPopup) {
+        currentPopup.remove();
+      }
+      
       const props = e.features[0].properties;
       const speed = props.Speed || 0;
       
@@ -408,9 +420,9 @@ function setupClickHandlers() {
         console.warn('No metadata available for', layerId);
       }
       
-      // Show popup
+      // Show popup and store reference
       const popupTripName = layerId.replace(/_/g, ' ').replace(/processed/gi, '').trim();
-      new mapboxgl.Popup()
+      currentPopup = new mapboxgl.Popup()
         .setLngLat(e.lngLat)
         .setHTML(`
           <strong>${popupTripName}</strong><br>
