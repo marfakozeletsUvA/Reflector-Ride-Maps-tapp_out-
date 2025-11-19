@@ -97,20 +97,48 @@ async function loadMetadata() {
 }
 
 function getTripStats(tripId) {
-  if (!tripsMetadata) return null;
-  
-  const cleanTripId = tripId.replace(/_processed$/i, '');
-  
-  if (!tripsMetadata[cleanTripId]) {
-    console.warn('No metadata for trip:', tripId);
+  if (!tripsMetadata) {
+    console.warn('⚠️ No metadata loaded');
     return null;
   }
   
-  const tripData = tripsMetadata[cleanTripId];
-  const meta = tripData.metadata || tripData;
+  // Try multiple variations of the trip ID
+  const variations = [
+    tripId,
+    tripId.replace(/_processed$/i, ''),
+    tripId.replace(/_processed$/i, '').replace(/_/g, ' '),
+    tripId.replace(/_/g, ' '),
+    tripId.replace(/ /g, '_')
+  ];
   
+  console.log('🔍 Looking for metadata with variations:', variations);
+  console.log('📋 Available metadata keys:', Object.keys(tripsMetadata));
+  
+  let tripData = null;
+  let foundKey = null;
+  
+  for (const variant of variations) {
+    if (tripsMetadata[variant]) {
+      tripData = tripsMetadata[variant];
+      foundKey = variant;
+      break;
+    }
+  }
+  
+  if (!tripData) {
+    console.warn('❌ No metadata found for any variation of:', tripId);
+    return null;
+  }
+  
+  console.log('✅ Found metadata using key:', foundKey);
+  
+  const meta = tripData.metadata || tripData;
   const gnssLine = meta['GNSS'];
-  if (!gnssLine) return null;
+  
+  if (!gnssLine) {
+    console.warn('❌ No GNSS data in metadata');
+    return null;
+  }
   
   const parts = gnssLine.split(',');
   
