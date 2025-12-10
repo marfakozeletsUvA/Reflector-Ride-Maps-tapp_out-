@@ -45,8 +45,8 @@ def main():
     
     # Set paths
     processed_dir = Path("processed_sensor_data")
-    output_file = Path("trips.pmtiles")
-    temp_mbtiles = Path("trips.mbtiles")
+    output_file = Path("bike_trips.pmtiles")
+    temp_mbtiles = Path("bike_trips.mbtiles")
     
     # Check input directory
     if not processed_dir.exists():
@@ -95,7 +95,7 @@ def main():
         '--minimum-zoom=10',
         '--drop-densest-as-needed',
         '--extend-zooms-if-still-dropping',
-        '--layer=trips',
+        # No --layer flag - let tippecanoe create layers from filenames
         '--include=Speed',
         '--include=road_quality',
         '--include=marker',
