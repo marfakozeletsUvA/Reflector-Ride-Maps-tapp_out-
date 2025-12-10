@@ -65,7 +65,7 @@ Distance: 5.2 km
 ### Step 2: Calculate Speeds from Sensor Data
 
 ```bash
-python combined_processor.py
+python integrated_processor.py
 ```
 
 **What it does:**
