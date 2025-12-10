@@ -45,8 +45,8 @@ def main():
     
     # Set paths
     processed_dir = Path("processed_sensor_data")
-    output_file = Path("bike_trips.pmtiles")
-    temp_mbtiles = Path("bike_trips.mbtiles")
+    output_file = Path("trips.pmtiles")
+    temp_mbtiles = Path("trips.mbtiles")
     
     # Check input directory
     if not processed_dir.exists():
