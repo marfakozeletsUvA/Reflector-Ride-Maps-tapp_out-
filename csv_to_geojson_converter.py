@@ -67,22 +67,39 @@ def process_csv(input_path, sensor_id, trip_num):
             except ValueError:
                 continue
 
+    # Process lines after GPS data
     for line in lines[last_gps_line + 1:]:
         line = line.strip()
         if not line:
             continue
+        
+        # Skip lines that start with commas (these are sensor data rows)
+        if line.startswith(','):
+            continue
+        
+        # Only process lines that contain a colon (key-value pairs)
+        # OR special header lines like "BLE Device Information Service"
         if ':' in line:
             key, val = line.split(':', 1)
-            metadata[key.strip()] = val.strip()
-        else:
+            key = key.strip()
+            # Make sure the key doesn't look like sensor data (no leading commas or numbers)
+            if key and not key[0].isdigit():
+                metadata[key] = val.strip()
+        elif line == "BLE Device Information Service":
             metadata[line] = line
+        elif line.startswith('SENSOR,') or line.startswith('GNSS,'):
+            # These are summary lines - parse them
+            parts = line.split(',', 1)
+            if len(parts) == 2:
+                metadata[parts[0]] = ',' + parts[1]
 
     return features, metadata
 
 def main():
     os.makedirs(OUTPUT_ROOT, exist_ok=True)
 
-    metadata_index_file = os.path.join(OUTPUT_ROOT, "trips_metadata.json")
+    # Save metadata file in the main directory (same as script)
+    metadata_index_file = "trips_metadata.json"
     if os.path.exists(metadata_index_file):
         with open(metadata_index_file, "r", encoding="utf-8") as f:
             all_metadata = json.load(f)
@@ -119,10 +136,11 @@ def main():
             with open(out_geojson, "w", encoding="utf-8") as f:
                 json.dump(geojson, f, indent=2)
 
-            all_metadata[trip_id] = {
-                "source_file": file,
-                "metadata": metadata
-            }
+            # Save metadata in the flat structure (not nested in "metadata")
+            trip_metadata = {"source_file": file}
+            trip_metadata.update(metadata)
+            all_metadata[trip_id] = trip_metadata
+            
             with open(metadata_index_file, "w", encoding="utf-8") as f:
                 json.dump(all_metadata, f, indent=2)
 

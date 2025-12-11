@@ -1,6 +1,5 @@
 import json
 import math
-import os
 import numpy as np
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -21,12 +20,14 @@ SKIP_TRIPS = {
 }
 
 def load_metadata():
-    """Load existing metadata file if it exists"""
+    """Load existing metadata file if it exists - READ ONLY"""
     meta_file = Path("trips_metadata.json")
     if meta_file.exists():
         try:
             with open(meta_file, 'r') as f:
-                return json.load(f)
+                metadata = json.load(f)
+                print(f"📖 Loaded metadata for {len(metadata)} trips (read-only)")
+                return metadata
         except Exception as e:
             print(f"⚠️  Could not load metadata file: {e}")
     return {}
@@ -434,15 +435,14 @@ def process_all_trips(input_dir=INPUT_ROOT, output_dir=OUTPUT_ROOT):
         print(f"❌ Directory not found: {input_dir}")
         return
     
-    # Load existing metadata (DO NOT overwrite!)
+    # Load existing metadata (DO NOT overwrite - csv_to_geojson owns this file!)
     saved_metadata = load_metadata()
-    if saved_metadata:
-        print(f"📖 Loaded existing metadata for {len(saved_metadata)} trips")
     
     print("\n🚴 Processing Bike Trip Data with Road Quality")
     print("=" * 60)
     print(f"📂 Input: {input_path}")
-    print(f"📂 Output: {output_path}\n")
+    print(f"📂 Output: {output_path}")
+    print(f"⚠️  NOTE: Metadata file is managed by csv_to_geojson_converter.py")
     
     total_files = 0
     processed_files = 0
