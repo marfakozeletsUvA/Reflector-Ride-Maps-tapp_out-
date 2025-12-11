@@ -1,4 +1,4 @@
-// app.js - Enhanced with Road Quality Layer
+// app.js - Enhanced with Road Quality Layer and Trip Search
 import { CONFIG } from './config.js';
 
 console.log('🚀 Starting bike visualization...');
@@ -27,7 +27,6 @@ const DEFAULT_COLOR = '#FF6600';
 
 // Speed color functions
 function getSpeedColorExpression(mode) {
-  // Handle both string and numeric Speed values
   const speedValue = [
     'to-number',
     ['coalesce', ['get', 'Speed'], ['get', 'speed'], 0]
@@ -66,12 +65,12 @@ function getRoadQualityColorExpression() {
   return [
     'match',
     ['get', 'road_quality'],
-    1, '#22C55E',  // Perfect - Green
-    2, '#84CC16',  // Normal - Light Green
-    3, '#FACC15',  // Outdated - Yellow
-    4, '#F97316',  // Bad - Orange
-    5, '#DC2626',  // No road - Red
-    '#808080'      // Unknown/No data - Gray
+    1, '#22C55E',
+    2, '#84CC16',
+    3, '#FACC15',
+    4, '#F97316',
+    5, '#DC2626',
+    '#808080'
   ];
 }
 
@@ -108,16 +107,14 @@ function getTripStats(tripId) {
     return null;
   }
   
-  // Try multiple variations to match metadata keys
-  // The layer IDs have _clean_processed but metadata has neither
   const variations = [
     tripId,
-    tripId.replace(/_clean_processed$/i, ''),  // Remove _clean_processed
-    tripId.replace(/_clean$/i, ''),             // Remove _clean
-    tripId.replace(/_processed$/i, ''),         // Remove _processed
-    tripId.replace(/_clean/gi, '').replace(/_processed/gi, ''), // Remove both anywhere
-    tripId.split('_clean')[0],                  // Take everything before _clean
-    tripId.split('_processed')[0]               // Take everything before _processed
+    tripId.replace(/_clean_processed$/i, ''),
+    tripId.replace(/_clean$/i, ''),
+    tripId.replace(/_processed$/i, ''),
+    tripId.replace(/_clean/gi, '').replace(/_processed/gi, ''),
+    tripId.split('_clean')[0],
+    tripId.split('_processed')[0]
   ];
   
   console.log('🔍 Looking for metadata. Layer ID:', tripId);
@@ -245,6 +242,71 @@ function showSelection(layerId) {
   document.getElementById('selectedTrip').textContent = tripName;
 }
 
+// NEW: Search and highlight trip
+function searchAndHighlightTrip(searchTerm) {
+  if (!searchTerm) {
+    resetSelection();
+    return;
+  }
+  
+  const normalizedSearch = searchTerm.toLowerCase().trim();
+  
+  // Find matching trip
+  const matchingTrip = tripLayers.find(layerId => 
+    layerId.toLowerCase().includes(normalizedSearch)
+  );
+  
+  if (matchingTrip) {
+    console.log('🎯 Found trip:', matchingTrip);
+    
+    // Highlight the trip
+    selectedTrip = matchingTrip;
+    tripLayers.forEach(id => {
+      try {
+        if (id === matchingTrip) {
+          map.setPaintProperty(id, 'line-opacity', 1.0);
+          map.setPaintProperty(id, 'line-width', 5);
+          map.setPaintProperty(id, 'line-color', '#FF00FF'); // Magenta for search result
+        } else {
+          map.setPaintProperty(id, 'line-opacity', 0.15);
+          map.setPaintProperty(id, 'line-width', 2);
+        }
+      } catch (err) {
+        console.error('Error updating layer:', id, err);
+      }
+    });
+    
+    showSelection(matchingTrip);
+    
+    // Zoom to the trip
+    try {
+      const features = map.querySourceFeatures('trips', {
+        sourceLayer: matchingTrip
+      });
+      
+      if (features.length > 0) {
+        const bbox = turf.bbox({
+          type: 'FeatureCollection',
+          features: features
+        });
+        
+        map.fitBounds(bbox, {
+          padding: 50,
+          duration: 1000
+        });
+      }
+    } catch (err) {
+      console.error('Error zooming to trip:', err);
+    }
+    
+    return true;
+  } else {
+    console.log('❌ No trip found matching:', searchTerm);
+    alert(`No trip found matching: ${searchTerm}`);
+    return false;
+  }
+}
+
 map.on('error', (e) => {
   console.error('❌ Map error:', e);
 });
@@ -311,6 +373,32 @@ function setupControls() {
   if (resetButton) {
     resetButton.addEventListener('click', () => {
       resetSelection();
+      // Reset colors when clearing selection
+      tripLayers.forEach(layerId => {
+        if (showSpeedColors) {
+          map.setPaintProperty(layerId, 'line-color', getSpeedColorExpression(speedMode));
+        } else if (showRoadQuality) {
+          map.setPaintProperty(layerId, 'line-color', getRoadQualityColorExpression());
+        } else {
+          map.setPaintProperty(layerId, 'line-color', DEFAULT_COLOR);
+        }
+      });
+    });
+  }
+  
+  // NEW: Trip search
+  const searchInput = document.getElementById('tripSearchInput');
+  const searchButton = document.getElementById('tripSearchButton');
+  
+  if (searchInput && searchButton) {
+    searchButton.addEventListener('click', () => {
+      searchAndHighlightTrip(searchInput.value);
+    });
+    
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        searchAndHighlightTrip(searchInput.value);
+      }
     });
   }
   
@@ -321,7 +409,6 @@ function setupControls() {
       showSpeedColors = e.target.checked;
       console.log('Speed colors toggled:', showSpeedColors);
       
-      // Turn off road quality if speed is turned on
       if (showSpeedColors && showRoadQuality) {
         showRoadQuality = false;
         document.getElementById('roadQualityCheckbox').checked = false;
@@ -355,7 +442,6 @@ function setupControls() {
       showRoadQuality = e.target.checked;
       console.log('Road quality toggled:', showRoadQuality);
       
-      // Turn off speed colors if road quality is turned on
       if (showRoadQuality && showSpeedColors) {
         showSpeedColors = false;
         document.getElementById('speedColorsCheckbox').checked = false;
@@ -447,7 +533,6 @@ function setupClickHandlers() {
         durationFormatted = '—';
       }
       
-      // Road quality labels
       const qualityLabels = {
         1: 'Perfect',
         2: 'Normal',
@@ -507,3 +592,6 @@ function updateStatsFromMetadata() {
     document.getElementById('statTrips').textContent = tripLayers.length;
   }
 }
+
+// Make search function available globally for console testing
+window.searchTrip = searchAndHighlightTrip;
